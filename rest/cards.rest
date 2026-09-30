@@ -1,0 +1,159 @@
+@baseUrl = http://localhost:3000
+@password = Aa123456!
+
+### Login as business user (seed)
+# @name loginBusiness
+POST {{baseUrl}}/users/login
+Content-Type: application/json
+
+{
+  "email": "business@test.com",
+  "password": "{{password}}"
+}
+
+### Login as regular user (seed)
+# @name loginRegular
+POST {{baseUrl}}/users/login
+Content-Type: application/json
+
+{
+  "email": "regular@test.com",
+  "password": "{{password}}"
+}
+
+### Login as admin (seed)
+# @name loginAdmin
+POST {{baseUrl}}/users/login
+Content-Type: application/json
+
+{
+  "email": "admin@test.com",
+  "password": "{{password}}"
+}
+
+@businessToken = {{loginBusiness.response.body.$.token}}
+@regularToken = {{loginRegular.response.body.$.token}}
+@adminToken = {{loginAdmin.response.body.$.token}}
+
+### 1. Get all cards
+# @name allCards
+GET {{baseUrl}}/cards
+
+### 2. Get my cards (registered user)
+GET {{baseUrl}}/cards/my-cards
+Authorization: Bearer {{businessToken}}
+
+### 4. Create card (business only)
+# @name createCard
+POST {{baseUrl}}/cards
+Authorization: Bearer {{businessToken}}
+Content-Type: application/json
+
+{
+  "title": "Pizza Place",
+  "subtitle": "Best pizza in town",
+  "description": "Family pizza restaurant with delivery.",
+  "phone": "050-5555555",
+  "email": "pizza@test.com",
+  "web": "https://example.com",
+  "image": {
+    "url": "https://picsum.photos/400/300",
+    "alt": "pizza"
+  },
+  "address": {
+    "state": "",
+    "country": "Israel",
+    "city": "Haifa",
+    "street": "Herzl",
+    "houseNumber": 12,
+    "zip": 3303012
+  }
+}
+
+@cardId = {{createCard.response.body.$._id}}
+
+### Create card as a regular user (expect 403)
+POST {{baseUrl}}/cards
+Authorization: Bearer {{regularToken}}
+Content-Type: application/json
+
+{
+  "title": "Not Allowed",
+  "subtitle": "Regular users cannot create cards",
+  "description": "This request should fail.",
+  "phone": "050-5555555",
+  "email": "nope@test.com",
+  "address": { "country": "Israel", "city": "Haifa", "street": "Herzl", "houseNumber": 1 }
+}
+
+### Create card with invalid data (expect 400)
+POST {{baseUrl}}/cards
+Authorization: Bearer {{businessToken}}
+Content-Type: application/json
+
+{
+  "title": "x"
+}
+
+### 3. Get card by id
+GET {{baseUrl}}/cards/{{cardId}}
+
+### Get card that does not exist (expect 404)
+GET {{baseUrl}}/cards/000000000000000000000000
+
+### 5. Update card (creator only)
+PUT {{baseUrl}}/cards/{{cardId}}
+Authorization: Bearer {{businessToken}}
+Content-Type: application/json
+
+{
+  "title": "Pizza Place Deluxe",
+  "subtitle": "Still the best pizza in town",
+  "description": "Family pizza restaurant with delivery and takeaway.",
+  "phone": "050-5555555",
+  "email": "pizza@test.com",
+  "web": "https://example.com/pizza",
+  "image": {
+    "url": "https://picsum.photos/400/300",
+    "alt": "pizza deluxe"
+  },
+  "address": {
+    "state": "",
+    "country": "Israel",
+    "city": "Haifa",
+    "street": "Herzl",
+    "houseNumber": 14,
+    "zip": 3303012
+  }
+}
+
+### Update card by someone who is not the creator (expect 403)
+PUT {{baseUrl}}/cards/{{cardId}}
+Authorization: Bearer {{regularToken}}
+Content-Type: application/json
+
+{
+  "title": "Hijacked",
+  "subtitle": "Should fail",
+  "description": "Only the creator can edit.",
+  "phone": "050-5555555",
+  "email": "pizza@test.com",
+  "address": { "country": "Israel", "city": "Haifa", "street": "Herzl", "houseNumber": 1 }
+}
+
+### 6. Like / unlike card (registered user, run twice to toggle)
+PATCH {{baseUrl}}/cards/{{cardId}}
+Authorization: Bearer {{regularToken}}
+
+### Bonus: change bizNumber (admin only, must be unique)
+PATCH {{baseUrl}}/cards/biz-number/{{cardId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "bizNumber": 1234567
+}
+
+### 7. Delete card (creator or admin)
+DELETE {{baseUrl}}/cards/{{cardId}}
+Authorization: Bearer {{businessToken}}

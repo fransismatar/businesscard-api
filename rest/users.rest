@@ -1,0 +1,163 @@
+@baseUrl = http://localhost:3000
+@password = Aa123456!
+
+### Login as regular user (seed)
+# @name loginRegular
+POST {{baseUrl}}/users/login
+Content-Type: application/json
+
+{
+  "email": "regular@test.com",
+  "password": "{{password}}"
+}
+
+### Login as admin (seed)
+# @name loginAdmin
+POST {{baseUrl}}/users/login
+Content-Type: application/json
+
+{
+  "email": "admin@test.com",
+  "password": "{{password}}"
+}
+
+@adminToken = {{loginAdmin.response.body.$.token}}
+
+### 1. Register user
+# @name register
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "name": {
+    "first": "Fransis",
+    "middle": "",
+    "last": "Mattar"
+  },
+  "phone": "050-0000000",
+  "email": "fransis@test.com",
+  "password": "{{password}}",
+  "image": {
+    "url": "https://picsum.photos/200",
+    "alt": "profile image"
+  },
+  "address": {
+    "state": "",
+    "country": "Israel",
+    "city": "Haifa",
+    "street": "Test Street",
+    "houseNumber": 5,
+    "zip": 0
+  },
+  "isBusiness": false
+}
+
+### Register with the same email again (expect 409)
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "name": { "first": "Fransis", "last": "Mattar" },
+  "phone": "050-0000000",
+  "email": "fransis@test.com",
+  "password": "{{password}}",
+  "address": { "country": "Israel", "city": "Haifa", "street": "Test Street", "houseNumber": 5 }
+}
+
+### Register trying to become admin (expect 400)
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "name": { "first": "Hacker", "last": "User" },
+  "phone": "050-0000001",
+  "email": "hacker@test.com",
+  "password": "{{password}}",
+  "address": { "country": "Israel", "city": "Haifa", "street": "Test Street", "houseNumber": 5 },
+  "isAdmin": true
+}
+
+### Register with invalid data (expect 400)
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "not-an-email",
+  "password": "123"
+}
+
+### 2. Login
+# @name login
+POST {{baseUrl}}/users/login
+Content-Type: application/json
+
+{
+  "email": "fransis@test.com",
+  "password": "{{password}}"
+}
+
+@token = {{login.response.body.$.token}}
+@userId = {{register.response.body.$._id}}
+
+### Login with wrong password (expect 401, 3 in a row blocks the email for 24h)
+POST {{baseUrl}}/users/login
+Content-Type: application/json
+
+{
+  "email": "fransis@test.com",
+  "password": "Wrong123!"
+}
+
+### 3. Get all users (admin only)
+GET {{baseUrl}}/users
+Authorization: Bearer {{adminToken}}
+
+### Get all users as a non-admin (expect 403)
+GET {{baseUrl}}/users
+Authorization: Bearer {{token}}
+
+### Get all users with an invalid token (expect 401)
+GET {{baseUrl}}/users
+Authorization: Bearer invalid.token.value
+
+### 4. Get user (self or admin)
+GET {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{token}}
+
+### Get user that does not exist (expect 404)
+GET {{baseUrl}}/users/000000000000000000000000
+Authorization: Bearer {{adminToken}}
+
+### 5. Update user (self only)
+PUT {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": {
+    "first": "Fransis",
+    "middle": "F",
+    "last": "Mattar"
+  },
+  "phone": "052-1234567",
+  "image": {
+    "url": "https://picsum.photos/300",
+    "alt": "new profile image"
+  },
+  "address": {
+    "state": "",
+    "country": "Israel",
+    "city": "Tel Aviv",
+    "street": "Dizengoff",
+    "houseNumber": 50,
+    "zip": 6433222
+  }
+}
+
+### 6. Change isBusiness status (self only, toggles true/false)
+PATCH {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{token}}
+
+### 7. Delete user (self or admin)
+DELETE {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{token}}
